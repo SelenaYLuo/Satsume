@@ -199,7 +199,9 @@
 //         emit RaffleInitiated(drawingID, requestId , msg.sender,cohort); 
 //     } 
 
+//     function initiateDrawing(uint256[] calldata drawingIDs, uint256[] calldata cohorts) public { 
 
+//     }
 
 //     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override{
 //         VRFRequestContext memory context = vrfRequestIDtoContext[requestId];
@@ -299,13 +301,9 @@
 
 //         // Calculate excess custody based on remaining participants in last cohort
 //         uint256 excessCustody = (numParticipants % drawing.cohortSize) * drawing.rebateAmount;
-        
-//         // Calculate and deduct commission
-//         uint256 commissionAmount = (excessCustody) * commission / 10000;
-//         earnedCommissions[drawing.erc20Token] += commissionAmount;
 
-//         // Pay the owner the remaining amount after deducting the commission
-//         IERC20(drawing.erc20Token).transfer(promotionsManager.getReceiverAddress(drawing.owner, drawing.erc20Token), excessCustody - commissionAmount); 
+//         // Pay the contract  owner the remaining amount 
+//         IERC20(drawing.erc20Token).transfer(contractOwner, excessCustody); 
         
 //         // Update storage values
 //         Drawing storage drawingStorage = Drawings[drawingID];
