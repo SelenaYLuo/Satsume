@@ -34,7 +34,7 @@ contract ReceiptManager is ERC721, IERC2981 {
     mapping(uint256 => address) public royaltyReceiver; 
     uint256 public receiptIDs;
     address[] public approvedCallers; 
-    mapping(uint256 => uint256) public royaltyBasisPoints; 
+    mapping(uint256 => uint16) public royaltyBasisPoints; 
     mapping(uint256  => address) public promotionOwners;
 
     //Modifier to restrict usage to the approved callers
@@ -104,14 +104,14 @@ contract ReceiptManager is ERC721, IERC2981 {
         return super.supportsInterface(interfaceId);
     }
 
-    function setRoyalty(uint256 promotionID, uint256 basisPoints) external onlyApprovedCallers {
+    function setRoyalty(uint256 promotionID, uint16 basisPoints) external onlyApprovedCallers {
         require(basisPoints <=10000, "Invalid"); //royalty over 100%
         royaltyBasisPoints[promotionID] = basisPoints; 
     }
 
     function royaltyInfo(uint256 tokenId, uint256 salePrice) external view override returns (address receiver, uint256 royaltyAmount) {
         // Return the royalty receiver and amount (calculated based on sale price)
-        uint256 promotionID = tokenContexts[tokenId].promotionID; 
+        uint256 promotionID = tokenContexts[uint256(tokenId)].promotionID; 
         if(promotionID == 0) {
             return (address(0), 0);
         }
@@ -149,8 +149,8 @@ contract ReceiptManager is ERC721, IERC2981 {
     
     function tokenURI(uint256 tokenID) public view override returns (string memory) {
         // Fetch promotionID and participantNumber from the Promotion Manager
-        uint256 promotionID = tokenContexts[tokenID].promotionID; 
-        uint256 participantNumber = tokenContexts[tokenID].participantNumber; 
+        uint256 promotionID = tokenContexts[uint256(tokenID)].promotionID; 
+        uint256 participantNumber = tokenContexts[uint256(tokenID)].participantNumber; 
 
         // Check if the promotionID is valid
         if (promotionID == 0) {
@@ -158,7 +158,7 @@ contract ReceiptManager is ERC721, IERC2981 {
         }
 
         // Retrieve the custom URI root for the promotion
-        string memory uriRoot = customURIRoot[promotionID];
+        string memory uriRoot = customURIRoot[uint256(promotionID)];
 
         // If no custom URI is set, use the default URI
         if (bytes(uriRoot).length == 0) {
