@@ -1,310 +1,287 @@
-//SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+// //SPDX-License-Identifier: UNLICENSED
+// pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/interfaces/IERC2981.sol";
-import "@openzeppelin/contracts/utils/Base64.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "hardhat/console.sol";
-import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
-import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../interfaces/IPromotionManager.sol";
+// import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+// import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+// import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+// import "@openzeppelin/contracts/utils/Base64.sol";
+// import "@openzeppelin/contracts/utils/Strings.sol";
+// import "hardhat/console.sol";
+// import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
+// import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
+// import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+// import "../interfaces/IPromotionManager.sol";
+// import "../interfaces/IPromotionsManager.sol";
 
-contract ISOManager is ERC721, IERC2981 {
-    using Strings for uint256;
-    struct ISO {
-        uint256 numTokens;
-        uint256 revShare;
-        uint256 price;
-        uint256 minted;
-        mapping(address => uint256) redeemableAmounts;
-        //address store;
-        address erc20Token;
-    }
-    struct ShareContext {
-        address store;
-        mapping(address => uint256) redeemedAmounts;
-    }
+// error TokenDoesNotExist();
+// error NotApproved();
 
-    mapping(address => ISO) public ISOs;
-    mapping(uint256 => ShareContext) public ShareContexts;
-    uint256 tokenIDs;
+// contract ISOManager is ERC721, IERC2981 {
+//     address public contractOwner;
+//     using Strings for uint256;
+//     struct ISO {
+//         uint256 numTokens;
+//         uint256 revShare;
+//         uint256 price;
+//         uint256 minted;
+//         mapping(address => uint256) redeemableAmounts;
+//         //address store;
+//         address erc20Token;
+//     }
+//     struct ShareContext {
+//         address store;
+//         uint256 shareNumber;
+//         mapping(address => uint256) redeemedAmounts;
+//     }
 
-    function createISO(
-        uint256 _numTokens,
-        uint256 _revShare,
-        uint256 _price,
-        address _erc20Token
-    ) public {
-        require(ISOs[msg.sender].numTokens == 0, "already ISO");
-        require(_numTokens > 0 && _numTokens * _revShare <= 10000);
+//     mapping(address => ISO) public ISOs;
+//     mapping(address => uint256[]) public addressToTokenIDs;
+//     mapping(uint256 => ShareContext) public ShareContexts;
+//     uint256 tokenIDs;
+//     bool openISOs = false;
+//     IPromotionsManager public promotionsManager;
+//     address public promotionsManagerAddress;
 
-        // Initialize a new drawing contract and store it in storage
-        ISO storage iso = ISOs[msg.sender];
-        iso.numTokens = _numTokens;
-        iso.revShare = _revShare;
-        iso.price = _price;
-        iso.erc20Token = _erc20Token;
-    }
+//     //Modifier to restrict usage to the contract owner
+//     modifier onlyOwner() {
+//         require(msg.sender == contractOwner, "Not Authorized");
+//         _;
+//     }
 
-    function buyISO(address store, uint256 numShares) public {
-        ISO storage iso = ISOs[store];
-        numShares; // = the lessor of numShares or iso.numTokens - iso.minted;
-        IERC20(iso.erc20Token).transferFrom(
-            msg.sender,
-            store,
-            numShares * iso.price
-        );
-        for (uint256 i = 1; i < numShares; i++) {
-            _mint(msg.sender, tokenIDs + i);
-            ShareContext storage shareContext = ShareContexts[tokenIDs + i];
-            shareContext.store = store;
-        }
-        tokenIDs += numShares;
-    }
+//     //Modifier to allow ISOs
+//     modifier allowedISOs() {
+//         require(openISOs == true, "ISOs not allowed");
+//         _;
+//     }
 
-    function payStore(
-        address store,
-        uint256 amount,
-        address erc20Token,
-        address payor
-    ) public {
-        if (ISOs[store].numTokens == 0) {
-            //no active ISO liabilities
-            IERC20(erc20Token).transferFrom(payor, store, amount);
-        } else {
-            //get amount for ISO shareholders
-            uint256 redeemable = (amount * ISOs[store]._revshare) / 10000;
-            uint256 toOwner = amount - redeemable * ISOs[store].numTokens;
-            IERC20(erc20Token).transferFrom(payor, store, toOwner);
-            IERC20(erc20Token).transferFrom(
-                payor,
-                address(this),
-                redeemable * ISOs[store].numTokens
-            );
-            ISOs[store].redeemableAmounts[erc20Token] += redeemable;
-        }
-    }
+//     modifier onlyApprovedOperators(address parentAccount) {
+//         require(
+//             promotionsManager.isApprovedOperator(msg.sender, parentAccount),
+//             "Not Approved"
+//         );
+//         _;
+//     }
 
-    function redeemDividends(
-        uint256 tokenID,
-        address[] calldata erc20Tokens
-    ) public {
-        require(msg.sender == ownerOf(tokenID), "Not Owner");
-        ShareContext storage shareContext = ShareContexts[tokenID];
-        ISO storage iso = ISOs[shareContext.store];
-        for (uint256 i = 0; i < erc20Tokens.length; i++) {
-            uint256 redeemable = iso.redeemableAmounts[erc20Tokens[i]] -
-                shareContext.redeemedAmounts[erc20Tokens[i]];
-            IERC20(erc20Tokens[i]).transfer(msg.sender, redeemable);
-            shareContext.redeemedAmounts[erc20Tokens[i]] = iso
-                .redeemableAmounts[erc20Tokens[i]];
-        }
-    }
+//     // Constructor to set the name and symbol of the ERC-721 token
+//     constructor() ERC721("ISOTokens", "ISO") {
+//         contractOwner = msg.sender;
+//     }
 
-    address public contractOwner;
-    string public defaultURIRoot = "amazon.com/";
-    // Mappings to store receipts by token ID
-    mapping(uint256 => string) public customURIRoot;
-    mapping(uint256 => address) public royaltyReceiver;
-    uint256 public receiptIDs;
-    address[] public approvedCallers;
-    mapping(uint256 => uint16) public royaltyBasisPoints;
-    mapping(uint256 => address) public promotionOwners;
+//     function setOwner(address payable newOwner) external onlyOwner {
+//         contractOwner = payable(newOwner);
+//     }
 
-    //Modifier to restrict usage to the approved callers
-    modifier onlyApprovedCallers() {
-        bool isApproved = false;
-        for (uint256 i = 0; i < approvedCallers.length; i++) {
-            if (approvedCallers[i] == msg.sender) {
-                isApproved = true;
-                break;
-            }
-        }
-        require(isApproved, "Not an approved caller");
-        _;
-    }
+//     function allowISOs() public onlyOwner {
+//         openISOs = true;
+//     }
 
-    //Modifier to restrict usage to the contract owner
-    modifier onlyOwner() {
-        require(msg.sender == contractOwner, "Not Authorized");
-        _;
-    }
+//     function createISO(
+//         uint256 _numTokens,
+//         uint256 _revShare,
+//         uint256 _price,
+//         address _erc20Token
+//     ) public allowedISOs {
+//         require(ISOs[msg.sender].numTokens == 0, "already ISO");
+//         require(_numTokens > 0 && _numTokens * _revShare <= 10000);
 
-    function setOwner(address payable newOwner) external onlyOwner {
-        contractOwner = payable(newOwner);
-    }
+//         // Initialize a new drawing contract and store it in storage
+//         ISO storage iso = ISOs[msg.sender];
+//         iso.numTokens = _numTokens;
+//         iso.revShare = _revShare;
+//         iso.price = _price;
+//         iso.erc20Token = _erc20Token;
+//     }
 
-    // Constructor to set the name and symbol of the ERC-721 token
-    constructor() ERC721("ReceiptNFT", "RPT") {
-        contractOwner = msg.sender;
-    }
+//     function buyISO(address store, uint256 numShares) public allowedISOs {
+//         ISO storage iso = ISOs[store];
+//         require(iso.numTokens > 0, "ISO doesn't exist"); // Check ISO exists
+//         require(numShares > 0, "Cannot buy 0 shares");
+//         if (iso.minted + numShares > iso.numTokens) {
+//             numShares = iso.numTokens - iso.minted;
+//         }
 
-    function setDefaultURIRoot(string calldata _newRoot) public onlyOwner {
-        defaultURIRoot = _newRoot;
-    }
+//         // Calculate total price with overflow check
+//         uint256 totalPrice = numShares * iso.price;
+//         require(totalPrice / iso.price == numShares, "Overflow detected");
 
-    function addApprovedCaller(address _toApprove) external onlyOwner {
-        require(_toApprove != address(0), "Cannot approve the zero address");
+//         // Transfer payment
+//         IERC20(iso.erc20Token).transferFrom(msg.sender, store, totalPrice);
 
-        uint256 length = approvedCallers.length; // Cache the length in memory
-        for (uint256 i = 0; i < length; i++) {
-            require(
-                approvedCallers[i] != _toApprove,
-                "Address is already approved"
-            );
-        }
+//         // Mint tokens and set context
+//         uint256 startTokenId = tokenIDs;
+//         for (uint256 i = 0; i < numShares; i++) {
+//             uint256 tokenId = startTokenId + i;
+//             _mint(msg.sender, tokenId);
+//             addressToTokenIDs[store].push(tokenId);
+//             ShareContexts[tokenId].shareNumber = addressToTokenIDs[store]
+//                 .length;
+//             ShareContexts[tokenId].store = store;
+//         }
 
-        approvedCallers.push(_toApprove);
-    }
+//         // Update state
+//         tokenIDs += numShares;
+//         iso.minted += numShares; // Track minted tokens
+//     }
 
-    function removeApprovedCaller(address _toRemove) external onlyOwner {
-        for (uint256 i = 0; i < approvedCallers.length; i++) {
-            if (approvedCallers[i] == _toRemove) {
-                // Swap the element to be removed with the last element
-                approvedCallers[i] = approvedCallers[
-                    approvedCallers.length - 1
-                ];
-                // Remove the last element from the array
-                approvedCallers.pop();
-                return;
-            }
-        }
-        revert("Address not found in approved callers.");
-    }
+//     function payStore(
+//         address store,
+//         uint256 toStore,
+//         uint256 commission,
+//         address erc20Token,
+//         address payor
+//     ) public {
+//         if (ISOs[store].numTokens == 0 || !openISOs) {
+//             //no active ISO liabilities
+//             IERC20(erc20Token).transferFrom(payor, store, toStore);
+//             IERC20(erc20Token).transferFrom(payor, address(this), commission);
+//         } else {
+//             //Separate amounts for storefronts and store shareholders + commissions
+//             uint256 redeemable = (toStore * ISOs[store].revShare) / 10000;
+//             uint256 toOwner = toStore - redeemable * ISOs[store].numTokens;
+//             IERC20(erc20Token).transferFrom(payor, store, toOwner);
+//             IERC20(erc20Token).transferFrom(
+//                 payor,
+//                 address(this),
+//                 redeemable * ISOs[store].numTokens + commission
+//             );
+//             ISOs[store].redeemableAmounts[erc20Token] += redeemable;
+//         }
+//     }
 
-    function getApprovedCallers() public view returns (address[] memory) {
-        return approvedCallers;
-    }
+//     function redeemDividends(
+//         uint256[] calldata tokenIDArray, // Array of token IDs
+//         address[] calldata erc20Tokens // Array of ERC20 tokens
+//     ) public {
+//         for (uint256 j = 0; j < tokenIDArray.length; j++) {
+//             uint256 tokenID = tokenIDArray[j];
 
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override(ERC721, IERC165) returns (bool) {
-        return super.supportsInterface(interfaceId);
-    }
+//             // Validate token ownership
+//             require(ownerOf(tokenID) == msg.sender, "Not owner of token");
 
-    function setRoyalty(
-        uint256 promotionID,
-        uint16 basisPoints
-    ) external onlyApprovedCallers {
-        require(basisPoints <= 10000, "Invalid"); //royalty over 100%
-        royaltyBasisPoints[promotionID] = basisPoints;
-    }
+//             ShareContext storage shareContext = ShareContexts[tokenID];
+//             ISO storage iso = ISOs[shareContext.store];
 
-    function royaltyInfo(
-        uint256 tokenId,
-        uint256 salePrice
-    ) external view override returns (address receiver, uint256 royaltyAmount) {
-        // Return the royalty receiver and amount (calculated based on sale price)
-        uint256 promotionID = tokenContexts[uint256(tokenId)].promotionID;
-        if (promotionID == 0) {
-            return (address(0), 0);
-        }
-        receiver = promotionOwners[promotionID];
-        royaltyAmount = (salePrice * royaltyBasisPoints[promotionID]) / 10000;
-        return (receiver, royaltyAmount);
-    }
+//             // Process each ERC20 token for dividends
+//             for (uint256 i = 0; i < erc20Tokens.length; i++) {
+//                 address tokenAddress = erc20Tokens[i];
 
-    function mintReceipts(
-        address to,
-        uint256 promotionID,
-        uint256 participantNumber,
-        uint256 numTokens
-    ) external onlyApprovedCallers returns (uint256) {
-        uint256 initialID = receiptIDs + 1;
-        for (uint256 i = 0; i < numTokens; i++) {
-            _mint(to, initialID + i);
-            tokenContexts[initialID + i] = TokenContext({
-                promotionID: promotionID,
-                participantNumber: participantNumber + i
-            });
-        }
-        receiptIDs += numTokens;
-        return initialID;
-    }
+//                 // Calculate redeemable amount
+//                 uint256 redeemable = iso.redeemableAmounts[tokenAddress] -
+//                     shareContext.redeemedAmounts[tokenAddress];
 
-    function incrementReceiptIDs(
-        uint256 numOrders
-    ) external onlyApprovedCallers returns (uint256) {
-        uint256 initialID = receiptIDs + 1;
-        receiptIDs += numOrders;
-        return initialID;
-    }
+//                 if (redeemable > 0) {
+//                     // Transfer dividends
+//                     IERC20(tokenAddress).transfer(msg.sender, redeemable);
 
-    function setPromotionOwner(
-        uint256 promotionID,
-        address promotionOwner
-    ) external onlyApprovedCallers {
-        promotionOwners[promotionID] = promotionOwner;
-    }
+//                     // Update redemption tracking
+//                     shareContext.redeemedAmounts[tokenAddress] = iso
+//                         .redeemableAmounts[tokenAddress];
+//                 }
+//             }
+//         }
+//     }
 
-    function modifyPromotionURI(
-        uint256 promotionID,
-        string calldata newURIRoot
-    ) external onlyApprovedCallers {
-        customURIRoot[promotionID] = newURIRoot;
-    }
+//     string public defaultURIRoot = "amazon.com/";
+//     // Mappings to store receipts by token ID
+//     mapping(address => string) public customURIRoot;
+//     mapping(address => address) public royaltyReceiver;
+//     mapping(address => uint16) public royaltyBasisPoints;
 
-    function tokenURI(
-        uint256 tokenID
-    ) public view override returns (string memory) {
-        // Fetch promotionID and participantNumber from the Promotion Manager
-        uint256 promotionID = tokenContexts[uint256(tokenID)].promotionID;
-        uint256 participantNumber = tokenContexts[uint256(tokenID)]
-            .participantNumber;
+//     function setCustomURIRoot(string calldata newRoot, address store) public {
+//         if (!promotionsManager.isApprovedOperator(msg.sender, store)) {
+//             revert NotApproved();
+//         }
+//         require(bytes(customURIRoot[store]).length == 0, "Aready Set");
+//         customURIRoot[store] = newRoot;
+//     }
 
-        // Check if the promotionID is valid
-        if (promotionID == 0) {
-            revert TokenDoesNotExist();
-        }
+//     function tokenURI(
+//         uint256 tokenID
+//     ) public view override returns (string memory) {
+//         ShareContext storage shareContext = ShareContexts[tokenID];
 
-        // Retrieve the custom URI root for the promotion
-        string memory uriRoot = customURIRoot[uint256(promotionID)];
+//         // Check if the tokenID is valid
+//         if (shareContext.store == address(0)) {
+//             revert TokenDoesNotExist();
+//         }
 
-        // If no custom URI is set, use the default URI
-        if (bytes(uriRoot).length == 0) {
-            //return string(abi.encodePacked(defaultURIRoot, "/", uint2str(tokenID), ".json"));
-            return
-                string(
-                    abi.encodePacked(
-                        defaultURIRoot,
-                        "/",
-                        uint2str(participantNumber),
-                        ".json"
-                    )
-                );
-        } else {
-            // Construct the custom URI using participantNumber
-            return
-                string(
-                    abi.encodePacked(
-                        uriRoot,
-                        "/",
-                        uint2str(participantNumber),
-                        ".json"
-                    )
-                );
-        }
-    }
+//         // Retrieve the custom URI root for the promotion
+//         string memory uriRoot = customURIRoot[shareContext.store];
 
-    // Convert uint256 to string
-    function uint2str(uint256 _i) internal pure returns (string memory) {
-        if (_i == 0) {
-            return "0";
-        }
-        uint256 j = _i;
-        uint256 len;
-        while (j != 0) {
-            len++;
-            j /= 10;
-        }
-        bytes memory bstr = new bytes(len);
-        while (_i != 0) {
-            bstr[--len] = bytes1(uint8(48 + (_i % 10)));
-            _i /= 10;
-        }
-        return string(bstr);
-    }
-}
+//         // If no custom URI is set, use the default URI
+//         if (bytes(uriRoot).length == 0) {
+//             //return string(abi.encodePacked(defaultURIRoot, "/", uint2str(tokenID), ".json"));
+//             return
+//                 string(
+//                     abi.encodePacked(
+//                         defaultURIRoot,
+//                         "/",
+//                         uint2str(shareContext.shareNumber),
+//                         ".json"
+//                     )
+//                 );
+//         } else {
+//             // Construct the custom URI using participantNumber
+//             return
+//                 string(
+//                     abi.encodePacked(
+//                         uriRoot,
+//                         "/",
+//                         uint2str(shareContext.shareNumber),
+//                         ".json"
+//                     )
+//                 );
+//         }
+//     }
+
+//     function supportsInterface(
+//         bytes4 interfaceId
+//     ) public view override(ERC721, IERC165) returns (bool) {
+//         return super.supportsInterface(interfaceId);
+//     }
+
+//     function setRoyalty(uint16 basisPoints, address store) external {
+//         if (!promotionsManager.isApprovedOperator(msg.sender, store)) {
+//             revert NotApproved();
+//         }
+//         require(basisPoints <= 10000, "Invalid"); //royalty over 100%
+//         royaltyBasisPoints[store] = basisPoints;
+//     }
+
+//     function royaltyInfo(
+//         uint256 tokenID,
+//         uint256 salePrice
+//     ) external view override returns (address receiver, uint256 royaltyAmount) {
+//         ShareContext storage shareContext = ShareContexts[tokenID];
+//         royaltyAmount =
+//             (salePrice * royaltyBasisPoints[shareContext.store]) /
+//             10000;
+//         return (shareContext.store, royaltyAmount);
+//     }
+
+//     // Convert uint256 to string
+//     function uint2str(uint256 _i) internal pure returns (string memory) {
+//         if (_i == 0) {
+//             return "0";
+//         }
+//         uint256 j = _i;
+//         uint256 len;
+//         while (j != 0) {
+//             len++;
+//             j /= 10;
+//         }
+//         bytes memory bstr = new bytes(len);
+//         while (_i != 0) {
+//             bstr[--len] = bytes1(uint8(48 + (_i % 10)));
+//             _i /= 10;
+//         }
+//         return string(bstr);
+//     }
+
+//     function setPromotionsManager(
+//         address _promotionsManagerAddress
+//     ) external onlyOwner {
+//         promotionsManagerAddress = _promotionsManagerAddress;
+//         promotionsManager = IPromotionsManager(_promotionsManagerAddress);
+//     }
+// }

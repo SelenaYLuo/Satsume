@@ -1,6 +1,6 @@
 pragma solidity ^0.8.24;
 
-interface IPromotionsManager {
+interface IMerchantManager {
     function approveOperator(
         address approvedOperator,
         address parentAccount

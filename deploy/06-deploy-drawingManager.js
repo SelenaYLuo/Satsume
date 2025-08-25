@@ -13,8 +13,10 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
 
   receiptManager = await deployments.get("ReceiptManager");
   receiptManagerAddress = receiptManager.address;
-  promotionsManager = await deployments.get("PromotionsManager");
-  promotionsManagerAddress = promotionsManager.address;
+  merchantManager = await deployments.get("MerchantManager");
+  merchantManagerAddress = merchantManager.address;
+  isoManager = await deployments.get("ISOManager");
+  isoManagerAddress = isoManager.address;
 
   const gasLane = networkConfig[chainId]["gasLane"];
   const callbackGasLimit = networkConfig[chainId]["callbackGasLimit"];
@@ -43,7 +45,8 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
   const args = [
     vrfCoordinatorV2Address,
     receiptManagerAddress,
-    promotionsManagerAddress,
+    merchantManagerAddress,
+    isoManagerAddress,
     gasLane,
     subscriptionId,
     callbackGasLimit,

@@ -27,4 +27,9 @@ interface IPromotionsManager {
         address userAddress,
         address tokenAddress
     ) external view returns (address);
+
+    function getAllApprovedPromotions()
+        external
+        view
+        returns (address[] memory);
 }

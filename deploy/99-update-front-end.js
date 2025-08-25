@@ -21,46 +21,67 @@ const VRF_COORDINATORV2_MOCK_ABI_FILE =
   "../satsumeFrontEnd/constants/VRFCOORDINATORV2MOCKABI.json";
 const PROMOTIONS_MANAGER_ABI_FILE =
   "../satsumeFrontEnd/constants/promotionsManagerABI.json";
+const MERCHANT_MANAGER_ABI_FILE =
+  "../satsumeFrontEnd/constants/merchantManagerABI.json";
+const ISO_MANAGER_ABI_FILE = "../satsumeFrontEnd/constants/isoManagerABI.json";
+const PROXY_ABI_FILE = "../satsumeFrontEnd/constants/proxyManagerABI.json";
 
 module.exports = async function ({ deployments }) {
   if (process.env.UPDATE_FRONT_END) {
     console.log("Updating front end");
-    await updateContractAddresses();
-    await updateAbi();
+    // await updateContractAddresses();
+    // await updateAbi();
     await addApprovedCallersToReceipManager();
     await setDefaultImageURL();
+    await addApprovedCallersToISOManager();
+    await proxySetUp();
     // await setLoanFactory_WorkingCapProvider();
     //await setSnowballContract();
   }
 };
 
 async function updateAbi() {
-  const snowballManager = await ethers.getContract("SnowballManager");
-  const seedManager = await ethers.getContract("SeedManager");
-  const receiptManager = await ethers.getContract("ReceiptManager");
-  const myToken = await ethers.getContract("MyToken");
-  const drawingManager = await ethers.getContract("DrawingManager");
-  const mock = await ethers.getContract("VRFCoordinatorV2Mock");
-  const promotionsManager = await ethers.getContract("PromotionsManager");
+  // const snowballManager = await deployments.get("SnowballManager");
+  const drawingManager = await deployments.get("DrawingManager");
+  // const seedManager = await deployments.get("SeedManager");
+  const receiptManager = await deployments.get("ReceiptManager");
+  const myToken = await deployments.get("MyToken");
+  const mock = await deployments.get("VRFCoordinatorV2Mock");
+  // const promotionsManager = await deployments.get("PromotionsManager");
+  const merchantManager = await deployments.get("MerchantManager");
+  const ISOManager = await deployments.get("ISOManager");
+  const proxy = await deployments.get("Proxy");
 
   // Update ABI for Snowball contract
-  fs.writeFileSync(
-    SNOWBALL_MANAGER_ABI_FILE,
-    JSON.stringify(snowballManager.interface.fragments, null, 2)
-  );
+  // fs.writeFileSync(
+  //   SNOWBALL_MANAGER_ABI_FILE,
+  //   JSON.stringify(snowballManager.interface.fragments, null, 2)
+  // );
 
   // Update ABI for drawing manager contract
-  fs.writeFileSync(
-    SEED_MANAGER_ABI_FILE,
-    JSON.stringify(seedManager.interface.fragments, null, 2)
-  );
+  // fs.writeFileSync(
+  //   SEED_MANAGER_ABI_FILE,
+  //   JSON.stringify(seedManager.interface.fragments, null, 2)
+  // );
 
   // Update ABI for drawing manager contract
+  // fs.writeFileSync(
+  //   DRAWING_MANAGER_ABI_FILE,
+  //   JSON.stringify(drawingManager.interface.fragments, null, 2)
+  // );
+  console.log("3");
   fs.writeFileSync(
-    DRAWING_MANAGER_ABI_FILE,
-    JSON.stringify(drawingManager.interface.fragments, null, 2)
+    PROXY_ABI_FILE,
+    JSON.stringify(proxy.interface.fragments, null, 2)
   );
-
+  fs.writeFileSync(
+    MERCHANT_MANAGER_ABI_FILE,
+    JSON.stringify(merchantManager.interface.fragments, null, 2)
+  );
+  fs.writeFileSync(
+    ISO_MANAGER_ABI_FILE,
+    JSON.stringify(ISOManager.interface.fragments, null, 2)
+  );
   // Update ABI for SnowballWorkingCapital contract
   fs.writeFileSync(
     RECEIPT_MANAGER_ABI_FILE,
@@ -80,20 +101,23 @@ async function updateAbi() {
   );
 
   // Update ABI for PromotionsManager contract
-  fs.writeFileSync(
-    PROMOTIONS_MANAGER_ABI_FILE,
-    JSON.stringify(promotionsManager.interface.fragments, null, 2)
-  );
+  // fs.writeFileSync(
+  //   PROMOTIONS_MANAGER_ABI_FILE,
+  //   JSON.stringify(promotionsManager.interface.fragments, null, 2)
+  // );
 }
 
 async function updateContractAddresses() {
-  const snowballManager = await deployments.get("SnowballManager");
+  // const snowballManager = await deployments.get("SnowballManager");
   const drawingManager = await deployments.get("DrawingManager");
-  const seedManager = await deployments.get("SeedManager");
+  // const seedManager = await deployments.get("SeedManager");
   const receiptManager = await deployments.get("ReceiptManager");
   const myToken = await deployments.get("MyToken");
   const mock = await deployments.get("VRFCoordinatorV2Mock");
-  const promotionsManager = await deployments.get("PromotionsManager");
+  // const promotionsManager = await deployments.get("PromotionsManager");
+  const merchantManager = await deployments.get("MerchantManager");
+  const ISOManager = await deployments.get("ISOManager");
+  const proxy = await deployments.get("Proxy");
 
   const chainId = network.config.chainId.toString();
 
@@ -108,13 +132,16 @@ async function updateContractAddresses() {
 
   // Update or create the new addresses for the current network
   addresses[chainId] = {
-    snowballManager: [snowballManager.address],
-    seedManager: [seedManager.address],
+    // snowballManager: [snowballManager.address],
+    // seedManager: [seedManager.address],
     drawingManager: [drawingManager.address],
     receiptManager: [receiptManager.address],
     MyToken: [myToken.address],
     VRFMock: [mock.address],
-    promotionsManager: [promotionsManager.address],
+    merchantManager: [merchantManager.address],
+    isoManager: [isoManager.address],
+    proxy: [proxy.address],
+    // promotionsManager: [promotionsManager.address],
   };
 
   fs.writeFileSync(
@@ -146,24 +173,54 @@ async function updateContractAddresses() {
 async function addApprovedCallersToReceipManager() {
   const receiptManager = await ethers.getContract("ReceiptManager");
   const drawingManager = await deployments.get("DrawingManager");
-  const snowballManager = await deployments.get("SnowballManager");
-  const seedManager = await deployments.get("SeedManager");
-  const promotionsManager = await deployments.get("PromotionsManager");
-
-  console.log(`Adding promo manager as approved to receipt  manager`);
-  const tx = await receiptManager.addApprovedCaller(snowballManager.address);
-  await tx.wait(); // Wait for the transaction to be mined
-  console.log("Approved");
+  // const snowballManager = await deployments.get("SnowballManager");
+  // const seedManager = await deployments.get("SeedManager");
 
   console.log(`Adding drawing manager as approved to receipt  manager`);
   const tx2 = await receiptManager.addApprovedCaller(drawingManager.address);
   await tx2.wait(); // Wait for the transaction to be mined
   console.log("Approved");
 
-  console.log(`Adding drawing manager as approved to receipt  manager`);
-  const tx3 = await receiptManager.addApprovedCaller(seedManager.address);
-  await tx3.wait(); // Wait for the transaction to be mined
+  // console.log(`Adding drawing manager as approved to receipt  manager`);
+  // const tx3 = await receiptManager.addApprovedCaller(seedManager.address);
+  // await tx3.wait(); // Wait for the transaction to be mined
+  // console.log("Approved");
+}
+
+async function addApprovedCallersToISOManager() {
+  console.log("Calling ISO Manager");
+  const isoManager = await ethers.getContract("ISOManager");
+  const drawingManager = await deployments.get("DrawingManager");
+  // const snowballManager = await deployments.get("SnowballManager");
+  // const seedManager = await deployments.get("SeedManager");
+
+  console.log(`Adding drawing manager as approved to iso  manager`);
+  const tx2 = await isoManager.addApprovedCaller(drawingManager.address);
+  await tx2.wait(); // Wait for the transaction to be mined
   console.log("Approved");
+
+  // console.log(`Adding drawing manager as approved to receipt  manager`);
+  // const tx3 = await receiptManager.addApprovedCaller(seedManager.address);
+  // await tx3.wait(); // Wait for the transaction to be mined
+  // console.log("Approved");
+}
+
+async function proxySetUp() {
+  console.log("Adding drawing manager to proxy");
+  const proxy = await ethers.getContract("Proxy");
+  const drawingManager = await deployments.get("DrawingManager");
+  // const snowballManager = await deployments.get("SnowballManager");
+  // const seedManager = await deployments.get("SeedManager");
+
+  console.log(`Adding drawing manager as approved toproxy`);
+  const tx2 = await proxy.approvePromotions(1, drawingManager.address);
+  await tx2.wait(); // Wait for the transaction to be mined
+  console.log("Approved");
+
+  // console.log(`Adding drawing manager as approved to receipt  manager`);
+  // const tx3 = await receiptManager.addApprovedCaller(seedManager.address);
+  // await tx3.wait(); // Wait for the transaction to be mined
+  // console.log("Approved");
 }
 
 async function setDefaultImageURL() {

@@ -4,15 +4,15 @@ pragma solidity ^0.8.24;
 error NotCustomURI();
 error URIAlreadSet();
 
-import "../interfaces/IReceiptManager.sol";
-import "../interfaces/IPromotionsManager.sol";
+import "../../interfaces/IReceiptManager.sol";
+import "../../interfaces/IMerchantManager.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-abstract contract PromotionManager {
+abstract contract SatsumePromotion {
     uint256 public commission = 200; // basis points (divided by 10,000)
     address public contractOwner;
     address public receiptManagerAddress;
-    address public promotionsManagerAddress;
+    address public merchantManagerAddress;
     mapping(address => uint256) public earnedCommissions;
     mapping(address => uint256) public withdrawnCommissions;
     mapping(address => mapping(address => bool)) public approvedOperators;
@@ -22,7 +22,7 @@ abstract contract PromotionManager {
     mapping(uint256 => uint256[]) public promotionIDToReceiptIDs;
     mapping(uint256 => uint256) public receiptIDToPromotionID;
     IReceiptManager public receiptManager;
-    IPromotionsManager public promotionsManager;
+    IMerchantManager public merchantManager;
 
     modifier onlyOwner() {
         require(msg.sender == contractOwner, "NotOwner");
@@ -36,7 +36,7 @@ abstract contract PromotionManager {
 
     modifier onlyApprovedOperators(address parentAccount) {
         require(
-            promotionsManager.isApprovedOperator(msg.sender, parentAccount),
+            merchantManager.isApprovedOperator(msg.sender, parentAccount),
             "Not Approved"
         );
         _;
@@ -90,10 +90,10 @@ abstract contract PromotionManager {
     }
 
     function setPromotionsManager(
-        address _promotionsManagerAddress
+        address _merchantManagerAddress
     ) external onlyOwner {
-        promotionsManagerAddress = _promotionsManagerAddress;
-        promotionsManager = IPromotionsManager(_promotionsManagerAddress);
+        merchantManagerAddress = _merchantManagerAddress;
+        merchantManager = IMerchantManager(_merchantManagerAddress);
     }
 
     function withdrawCommissions(address erc20Token) external onlyOwner {

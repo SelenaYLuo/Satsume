@@ -11,9 +11,9 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
   const { deployer } = await getNamedAccounts();
   const chainId = network.config.chainId;
 
-  log("Deploying Promotions Manager");
+  log("Deploying ISO Manager");
   const args = [];
-  const ReceiptManager = await deploy("PromotionsManager", {
+  const ReceiptManager = await deploy("ISOManager", {
     from: deployer,
     args: args,
     log: true,
@@ -21,7 +21,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
   });
 
   if (developmentChains.includes(network.name)) {
-    PromotionsManager = await deployments.get("PromotionsManager");
+    ISOManager = await deployments.get("ISOManager");
   }
 
   if (
@@ -29,7 +29,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     process.env.ETHERSCAN_API_KEY
   ) {
     log("Verifying...");
-    await verify(PromotionsManager.address, args);
+    await verify(ISOManager.address, args);
   }
   log("--------------------------------------------------------");
 };
